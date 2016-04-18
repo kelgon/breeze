@@ -17,6 +17,12 @@ breeze使用Kafka进行消息的异步处理。可以让日志产生端与数据
 
 * breeze-watcher
  是独立运行的Java进程，基于Quartz scheduler实现。它运行着多个定时任务：
- 1. 监控Kafka集群和MongoDB集群的状态，并发出预警
+ 1. 对结构化日志进行监控和预警，监控触发的时间周期、数据检索条件、阈值等均可以通过配置文件定义
  2. 在MongoDB Collection需要滚动切分前创建新的collection，并可通过配置实现在指定属性上自动创建索引
- 3. 对结构化日志进行监控
+ 3. 监控Kafka集群和MongoDB集群的状态，并发出预警
+
+## 先决条件
+如前文所述，breeze的运行基于Kafka和MongoDB，breeze自身是使用Java开发的，所以也需要Java环境。
+
+Kafka和MongoDB的集群搭建可以参考[环境搭建说明](/#)
+* Kafka 0.9.0.1
