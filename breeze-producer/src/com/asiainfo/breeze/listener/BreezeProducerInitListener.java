@@ -16,9 +16,9 @@ public class BreezeProducerInitListener implements ServletContextListener {
 	}
 
 	public void contextInitialized(ServletContextEvent arg0) {
-		log.info("初始化KafkaProducerClient...");
+		log.info("Initializing KafkaProducerClient...");
 		BreezeProducer.init();
-		log.info("KafkaProducerClient初始化完成");
+		log.info("KafkaProducerClient initialization complete");
 	}
 
 }

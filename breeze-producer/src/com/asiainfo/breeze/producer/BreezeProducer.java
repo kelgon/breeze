@@ -1,6 +1,7 @@
 package com.asiainfo.breeze.producer;
 
 import java.io.InputStream;
+import java.util.Date;
 import java.util.Properties;
 
 import org.apache.commons.logging.Log;
@@ -10,6 +11,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 
 public class BreezeProducer {
 	private static final Log log = LogFactory.getLog(BreezeProducer.class);
@@ -23,39 +25,45 @@ public class BreezeProducer {
 				props.load(is);
 				kp = new KafkaProducer<String, String>(props);
 			} catch(Throwable t) {
-				log.error("初始化KafkaProducerClient失败", t);
+				log.error("Initialize KafkaProducerClient failed", t);
 				kp = null;
 			}
 		}
 	}
 	
 	/**
-	 * 向Kafka集群发送一个结构化日志对象
-	 * @param topic 对象消息所属的topic
-	 * @param key 要发送对象的key，用于Kafka集群节点间的负载均衡，所以需尽可能确保key的分散度
-	 * @param o 要发送的结构化日志，必须为POJO对象
-	 * @param callback 发送完成后的回调逻辑
+	 * Send a POJO record to Kafka cluster
+	 * @param topic The topic of Kafka will be apended to
+	 * @param key Key of the record, useful for load balancing among partitions
+	 * @param o The record to be sent, must be POJO
+	 * @param createTime The creation-time of the record(Accurate to milliseconds)
+	 * @param callback The code to execute when the request is complete
 	 */
-	public void send(String topic, String key, Object o, Callback callback) {
+	public void send(String topic, String key, Object o, Date createTime, Callback callback) {
 		if(kp == null) {
 			init();
 		}
-		String objString = JSON.toJSONString(o);
+		JSONObject obj = (JSONObject)JSON.toJSON(o);
+		obj.put("brzRcdCrtTime", createTime.getTime());
+		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, key, objString), callback);
 	}
 	
 
 	/**
-	 * 向Kafka服务（单点）发送一个结构化日志对象（不推荐）
-	 * @param topic 对象消息所属的topic
-	 * @param o 要发送的结构化日志，必须为POJO对象
-	 * @param callback 发送完成后的回调逻辑
+	 * Send a POJO record to a single-node Kafka (Not recommend)
+	 * @param topic The topic of Kafka will be apended to
+	 * @param o The record to be sent, must be POJO
+	 * @param createTime The creation-time of the record(Accurate to milliseconds)
+	 * @param callback The code to execute when the request is complete
 	 */
-	public void send(String topic, Object o, Callback callback) {
+	public void send(String topic, Object o, Date createTime, Callback callback) {
 		if(kp == null) {
 			init();
 		}
-		String objString = JSON.toJSONString(o);
+		JSONObject obj = (JSONObject)JSON.toJSON(o);
+		obj.put("brzRcdCrtTime", createTime.getTime());
+		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, objString), callback);
 	}
 }
