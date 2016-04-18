@@ -21,8 +21,15 @@ breeze使用Kafka进行消息的异步处理。可以让日志产生端与数据
  2. 在MongoDB Collection需要滚动切分前创建新的collection，并可通过配置实现在指定属性上自动创建索引
  3. 监控Kafka集群和MongoDB集群的状态，并发出预警
 
-## 先决条件
-如前文所述，breeze的运行基于Kafka和MongoDB，breeze自身是使用Java开发的，所以也需要Java环境。
+> 每个组件目录下的readme文件有针对该组件的详细说明
 
-Kafka和MongoDB的集群搭建可以参考[环境搭建说明](/#)
-* Kafka 0.9.0.1
+## 先决条件
+如前文所述，breeze的运行基于Kafka和MongoDB，breeze自身是使用Java开发的，所以也需要Java环境（breeze的编译和运行需要JDK1.5+，Kafka的运行则推荐需要7u51+的JDK）
+
+Kafka和MongoDB的集群搭建可以参考[环境搭建说明](/#)。
+
+你也可以使用已有的Kafka/MongoDB集群，下面是对Kafka和MongoDB版本的要求：
+* Kafka 0.9.0.*
+* MongoDB 3.2.*
+
+> breeze的每个组件都依赖不同的java类库，具体请参见组件目录下的readme文件
