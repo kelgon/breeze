@@ -53,27 +53,27 @@ public class ConsumerRunner {
 				serverList.add(sa);
 			}
 			
-			String recordDbName = props.getProperty("record.dbname");
+			String recordDbName = props.getProperty("breeze.recordDbname");
 			if("".equals(recordDbName) || recordDbName == null) {
 				log.error("record.dbname must not be null or empty!");
 				return false;
 			}
-			String recordCredentials = props.getProperty("record.credentials");
-			String configDbName = props.getProperty("config.dbname");
+			String recordCredentials = props.getProperty("breeze.recordCredentials");
+			String configDbName = props.getProperty("breeze.configDbname");
 			if("".equals(configDbName) || configDbName == null) {
 				log.error("config.dbname must not be null or empty!");
 				return false;
 			}
-			String configCredentials = props.getProperty("config.credentials");
+			String configCredentials = props.getProperty("breeze.configCredentials");
 			List<MongoCredential> mCreList = new ArrayList<MongoCredential>();
 			if(!"".equals(recordCredentials) && recordCredentials != null) {
 				String[] cre = recordCredentials.split(":");
-				MongoCredential credential = MongoCredential.createMongoCRCredential(cre[0], recordDbName, cre[1].toCharArray());
+				MongoCredential credential = MongoCredential.createScramSha1Credential(cre[0], recordDbName, cre[1].toCharArray());
 				mCreList.add(credential);
 			}
 			if(!"".equals(configCredentials) && configCredentials != null) {
 				String[] cre = configCredentials.split(":");
-				MongoCredential credential = MongoCredential.createMongoCRCredential(cre[0], configDbName, cre[1].toCharArray());
+				MongoCredential credential = MongoCredential.createScramSha1Credential(cre[0], configDbName, cre[1].toCharArray());
 				mCreList.add(credential);
 			}
 			
@@ -136,7 +136,10 @@ public class ConsumerRunner {
 				options.sslInvalidHostNameAllowed(Boolean.parseBoolean(props.getProperty("mongo.sslInvalidHostNameAllowed")));
 			
 			log.info("initializing mongodb client...");
-			InstanceHolder.mClient = new MongoClient(serverList, mCreList);
+			if(mCreList.size() > 0)
+				InstanceHolder.mClient = new MongoClient(serverList, mCreList, options.build());
+			else
+				InstanceHolder.mClient = new MongoClient(serverList);
 			InstanceHolder.recordMdb = InstanceHolder.mClient.getDatabase(recordDbName);
 			InstanceHolder.configMdb = InstanceHolder.mClient.getDatabase(configDbName);
 			return true;
@@ -147,34 +150,38 @@ public class ConsumerRunner {
 	}
 	
 	private static boolean initBreezeConsumer() {
-		ProducerThread pt = new ProducerThread();
-		Timer timer = new Timer();
+		InstanceHolder.pt = new ProducerThread();
+		InstanceHolder.timer = new Timer();
 		try {
 			log.debug("loading breeze-consumer.properties...");
 			InputStream is = ConsumerRunner.class.getClassLoader().getResourceAsStream("breeze-consumer.properties");
 			Properties props = new Properties();
 			props.load(is);
+			log.info("initializing blocking queue...");
 			String queueSize = props.getProperty("consumer.queueSize");
 			if("".equals(queueSize) || queueSize == null) {
 				log.error("consumer.queueSize must not be null or empty!");
 				return false;
 			}
-			log.info("initializing blocking queue...");
 			if("0".equals(queueSize))
 				InstanceHolder.queue = new LinkedBlockingQueue<String>();
 			else
 				InstanceHolder.queue = new LinkedBlockingQueue<String>(Integer.parseInt(queueSize));
-			String threadCount = props.getProperty("consumer.threadCount");
-			if("".equals(threadCount) || threadCount == null) {
-				log.error("consumer.threadCount must not be null or empty!");
+			log.info("subscribing topic...");
+			String topic = props.getProperty("consumer.kafkaTopic");
+			if("".equals(topic) || topic == null) {
+				log.error("consumer.kafkaTopic must not be null or empty!");
 				return false;
 			}
-			//
+			InstanceHolder.kc.subscribe(Arrays.asList(topic));
+			
+			log.info("setting collection name...");
 			String collection = props.getProperty("record.collectionName");
 			if("".equals(collection) || collection == null) {
 				log.error("record.collectionName must not be null or empty!");
 				return false;
 			}
+			InstanceHolder.collection = collection;
 			String rollBy = props.getProperty("record.rollBy");
 			if("day".equalsIgnoreCase(rollBy) || "month".equalsIgnoreCase(rollBy)) {
 				InstanceHolder.rollBy = rollBy;
@@ -183,38 +190,44 @@ public class ConsumerRunner {
 			}
 			
 			log.info("initializing producer&consumer threads...");
+			String threadCount = props.getProperty("consumer.threadCount");
+			if("".equals(threadCount) || threadCount == null) {
+				log.error("consumer.threadCount must not be null or empty!");
+				return false;
+			}
 			int cCount = Integer.parseInt(threadCount);
 			InstanceHolder.cThreads = new HashSet<ConsumerThread>();
+			int i=0;
 			while(InstanceHolder.cThreads.size() < cCount) {
 				ConsumerThread ct = new ConsumerThread();
+				ct.setName("Consumer-"+i);
 				InstanceHolder.cThreads.add(ct);
+				i++;
 			}
+			InstanceHolder.consumerNameCount = i;
 			//启动线程
+			log.info("launching threads...");
 			for(ConsumerThread ct : InstanceHolder.cThreads) {
 				ct.start();
 			}
-			pt.start();
+			InstanceHolder.pt.start();
 			//激活定时任务，每5分钟检查线程与队列状况并告警
-			timer.schedule(new DaemonTask(pt), 10000, 5*60*1000);
+			InstanceHolder.timer.schedule(new DaemonTask(), 10000, 5*60*1000);
 			return true;
 		} catch(Throwable t) {
 			log.error("initializing breeze-consumer failed", t);
-			log.error("failed to start breeze-consumer, cleaning...");
-			pt.sigStop();
-			for(ConsumerThread ct : InstanceHolder.cThreads) {
-				ct.sigStop();
-			}
-			timer.cancel();
+			System.exit(0);
 			return false;
 		}
 	}
 	
 	public static void main(String[] args) {
 		PropertyConfigurator.configure(ConsumerRunner.class.getClassLoader().getResource("log4j.properties"));
-		log.info("initializing kafka client...");
-		if(ConsumerRunner.initKafkaConsumer()) {
-			log.info("initializing mongo client...");
-			if(ConsumerRunner.initMongo()) {
+		Runtime.getRuntime().addShutdownHook(new CleanWorkThread());
+		log.info("initializing mongo client...");
+		if(ConsumerRunner.initMongo()) {
+			log.info("initializing kafka client...");
+			if(ConsumerRunner.initKafkaConsumer()) {
 				log.info("initializing breeze-consumer...");
 				if(ConsumerRunner.initBreezeConsumer()) {
 					log.info("breeze-consumer started");

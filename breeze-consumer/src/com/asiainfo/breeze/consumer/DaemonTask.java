@@ -18,10 +18,8 @@ import com.asiainfo.breeze.util.InstanceHolder;
  */
 public class DaemonTask extends TimerTask {
 	private final static Logger log = Logger.getLogger(DaemonTask.class);
-	private ProducerThread pt;
-	public DaemonTask(ProducerThread pt) {
+	public DaemonTask() {
 		super();
-		this.pt = pt;
 	}
 
 	public void run() {
@@ -32,11 +30,11 @@ public class DaemonTask extends TimerTask {
 			props.load(is);
 			//检查ProducerThread状态
 			try {
-				if(!State.NEW.equals(pt.getState()) && !State.TERMINATED.equals(pt.getState())) {
-					log.info("ProducerThread is working, state: " + pt.getState().toString());
+				if(!State.NEW.equals(InstanceHolder.pt.getState()) && !State.TERMINATED.equals(InstanceHolder.pt.getState())) {
+					log.info("ProducerThread is working, state: " + InstanceHolder.pt.getState().toString());
 				} else {
-					log.error("ProducerThread is not working, state: " + pt.getState().toString());
-					AlarmSender.sendAlarm("[breeze-consumer] ProducerThread abnormal state: " + pt.getState().toString());
+					log.error("ProducerThread is not working, state: " + InstanceHolder.pt.getState().toString());
+					AlarmSender.sendAlarm("[breeze-consumer] ProducerThread abnormal state: " + InstanceHolder.pt.getState().toString());
 				}
 			} catch(Throwable t) {
 				log.error("ProducerThread state-check failed", t);
@@ -60,8 +58,10 @@ public class DaemonTask extends TimerTask {
 				if(newCount > liveCount) {
 					log.info("Starting new ConsumerThread to match consumer.threadCount [" + newCount + "] ...");
 					for(int i = 0; i < newCount - liveCount; i++) {
+						InstanceHolder.consumerNameCount++;
 						ConsumerThread consumerT = new ConsumerThread();
 						InstanceHolder.cThreads.add(consumerT);
+						consumerT.setName("Consumer-" + InstanceHolder.consumerNameCount);
 						consumerT.start();
 					}
 				}

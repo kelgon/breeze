@@ -2,6 +2,7 @@ package com.asiainfo.breeze.consumer;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.log4j.Logger;
 import org.bson.Document;
@@ -23,9 +24,11 @@ public class ConsumerThread extends Thread {
 		while(run) {
 			try {
 				log.debug("Taking record from queue...");
-				String record = InstanceHolder.queue.take();
-				log.debug("Record fetched: "+record);
+				String record = InstanceHolder.queue.poll(5000, TimeUnit.MILLISECONDS);
+				if(record == null)
+					continue;
 				
+				log.debug("Record fetched: "+record);
 				Document doc = Document.parse(record);
 				long createTime = doc.getLong("brzRcdCrtTime");
 				doc.remove("brzRcdCrtTime");

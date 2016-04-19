@@ -1,11 +1,13 @@
 package com.asiainfo.breeze.util;
 
 import java.util.Set;
+import java.util.Timer;
 import java.util.concurrent.BlockingQueue;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import com.asiainfo.breeze.consumer.ConsumerThread;
+import com.asiainfo.breeze.consumer.ProducerThread;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoDatabase;
 
@@ -18,5 +20,9 @@ public class InstanceHolder {
 	public static MongoDatabase recordMdb;
 	public static MongoDatabase configMdb;
 	public static BlockingQueue<String> queue;
+	public static ProducerThread pt;
 	public static Set<ConsumerThread> cThreads;
+	public static Timer timer;
+	
+	public static int consumerNameCount;
 }

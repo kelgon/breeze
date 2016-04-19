@@ -27,6 +27,8 @@ public class ProducerThread extends Thread{
 					InstanceHolder.queue.put(record.value());
 				}
 				log.info("added " + records.count() + " records to the queue, queue length: " + InstanceHolder.queue.size());
+				if(records.count() > 0)
+					InstanceHolder.kc.commitSync();
 				Thread.sleep(1000);
 			} catch(Throwable t) {
 				log.error("Error occured in producer thead", t);
