@@ -19,7 +19,7 @@ public class BreezeProducer {
 	
 	public static synchronized void init() {
 		if(kp == null) {
-			InputStream is = BreezeProducer.class.getClassLoader().getResourceAsStream("breeze.properties");
+			InputStream is = BreezeProducer.class.getClassLoader().getResourceAsStream("breeze-kafka.properties");
 			Properties props = new Properties();
 			try {
 				props.load(is);
@@ -36,15 +36,17 @@ public class BreezeProducer {
 	 * @param topic The topic of Kafka will be apended to
 	 * @param key Key of the record, useful for load balancing among partitions
 	 * @param o The record to be sent, must be POJO
+	 * @param collection witch mongodb collection should this record append to
 	 * @param createTime The creation-time of the record(Accurate to milliseconds)
 	 * @param callback The code to execute when the request is complete
 	 */
-	public void send(String topic, String key, Object o, Date createTime, Callback callback) {
+	public void send(String topic, String key, Object o, String collection, Date createTime, Callback callback) {
 		if(kp == null) {
 			init();
 		}
 		JSONObject obj = (JSONObject)JSON.toJSON(o);
 		obj.put("brzRcdCrtTime", createTime.getTime());
+		obj.put("bzRctCollection", collection);
 		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, key, objString), callback);
 	}
@@ -54,15 +56,17 @@ public class BreezeProducer {
 	 * Send a POJO record to a single-node Kafka (Not recommend)
 	 * @param topic The topic of Kafka will be apended to
 	 * @param o The record to be sent, must be POJO
+	 * @param collection witch mongodb collection should this record append to
 	 * @param createTime The creation-time of the record(Accurate to milliseconds)
 	 * @param callback The code to execute when the request is complete
 	 */
-	public void send(String topic, Object o, Date createTime, Callback callback) {
+	public void send(String topic, Object o, String collection, Date createTime, Callback callback) {
 		if(kp == null) {
 			init();
 		}
 		JSONObject obj = (JSONObject)JSON.toJSON(o);
 		obj.put("brzRcdCrtTime", createTime.getTime());
+		obj.put("brzRcdCollection", collection);
 		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, objString), callback);
 	}
