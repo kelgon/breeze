@@ -26,9 +26,7 @@ breeze使用Kafka进行消息的异步处理。可以让日志产生端与数据
 ## 先决条件
 如前文所述，breeze的运行基于Kafka和MongoDB，breeze自身是使用Java开发的，所以也需要Java环境（breeze的编译和运行需要JDK1.5+，Kafka的运行则推荐需要7u51+的JDK）
 
-Kafka和MongoDB的集群搭建可以参考[环境搭建说明](/#)。
-
-你也可以使用已有的Kafka/MongoDB集群，下面是对Kafka和MongoDB版本的要求：
+对Kafka和MongoDB版本的要求：
 * Kafka 0.9.0.*
 * MongoDB 3.2.*
 
