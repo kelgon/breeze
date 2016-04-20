@@ -45,6 +45,21 @@
         <version>1.2</version>
     </dependency>
 
+#### 创建breeze-kafka.properties
+breeze-producer的运行依赖于kafka client，需要在classpath下添加breeze-kafka.properties文件
+以下是一个基本的breeze-kafka.properties文件样例
+
+    bootstrap.servers=10.0.100.1:9092,10.0.100.2:9092
+    acks=1
+    retries=3
+    batch.size=16384
+    key.serializer=org.apache.kafka.common.serialization.StringSerializer
+    value.serializer=org.apache.kafka.common.serialization.StringSerializer
+    buffer.memory=33554432
+    request.timeout.ms=30000
+    max.request.size=1048576
+
+更加详细的配置项，请参考[Kafka Document](http://kafka.apache.org/documentation.html#producerconfigs)
 
 #### 初始化
 如果breeze-producer尚未初始化，在调用BreezeProducer类的send方法时会自动进行初始化
