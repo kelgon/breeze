@@ -13,9 +13,9 @@
 
 bin目录下的tar包已经包含了所有依赖的jar包
 
-## 如何使用
+## 准备工作
 #### 修改配置文件
-breeze-consumer.jar中共有三个properties文件，在启动前先需要根据实际环境进行修改
+breeze-consumer.jar中共有4个properties文件，在启动前先需要根据实际环境进行修改
 
 ##### breeze-kafka.properties
 
@@ -50,8 +50,25 @@ breeze-consumer本身的相关配置
     #任务积压告警阈值
     record.queueSizeAlarmThreshold=3000
 
+##### log4j.properties
+
+将log的输出日志路径修改为实际路径，也可根据需求进行其他的日志输出配置调整
+
+#### 修改start.sh
+
+修改start.sh中第5行和第16行的路径为实际部署breeze-consumer的路径
 
 #### 修改AlarmSender（可选）
 在DaemonTask线程检查发现breeze-consumer的ProducerThread和ConsumerThread出现问题时，以及发现阻塞队列内积压的任务数量超过阈值时，会通过AlarmSender类进行告警。
 
 默认的告警方式是向一个单独的文件中输出告警日志（alarm.log），如果你希望通过其他方式进行告警（如短信、邮件、http等），可对AlarmSender类进行改造，或者启动一个独立的进程持续检查alarm.log，以实现其他形式的告警。
+
+
+## 启动与停止breeze-consumer
+
+* 执行./start.sh启动breeze-consumer
+* 执行./stop.sh [breeze-consumer的文件夹名]停止breezez-consumer
+
+例如，breeze-consumer的路径为/home/user01/breeze-consumer01/，则执行命令./stop.sh breeze-consumer01来停止breeze-consumer
+
+也可以通过kill [pid]的方式停止breeze-consumer，但请注意不要使用kill -9命令，否则会导致队列中的和尚未持久化至mongoDB的消息彻底丢失
