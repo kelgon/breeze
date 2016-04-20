@@ -21,6 +21,10 @@
 * log4j-1.2.17 (非必须，用于输出日志，可用其他commons-logging支持的日志框架替代)
 * slf4j-log4j12-1.7.12 (非必须，用于利用log4j输出Kafka日志)
 
+
+## 如何使用
+#### 引入breeze-producer.jar及其依赖包
+
 如使用maven管理依赖：
 
     <dependency>
@@ -42,5 +46,16 @@
     </dependency>
 
 
+#### 初始化
+如果breeze-producer尚未初始化，在调用BreezeProducer类的send方法时会自动进行初始化
 
+如果在JSP中使用，可直接在web.xml中注册listener:
 
+    <listener>
+        <listener-class>com.asiainfo.breeze.listener.BreezeProducerInitListener</listener-class>
+    </listener>
+
+这样breeze-producer就会在JSP容器启动时自动初始化
+
+### 推送结构化日志
+BreezeProducer类提供了两种方法
