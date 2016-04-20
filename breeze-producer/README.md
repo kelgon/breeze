@@ -95,7 +95,7 @@ Parameters:
 * key: 待发送对象的key，用于Kafka集群的负载均衡
 * o: 待发送的对象，必须是POJO
 * collection: 结构化消息在MongoDB中对应的collection名，如果传递null或空串，breeze-consumer会使用默认的collection(record.defaultCollectionName)
-* createTime: 结构化消息的创建时间，用于决定该消息插入的collection的日期后缀。如果breeze-consumer中未配置rollBy策略，此参数会被忽视
+* createTime: 结构化消息的创建时间，用于决定该消息插入的collection的日期后缀。如果breeze-consumer中未配置rollBy策略，此参数会被忽视。如果传null，breeze-consumer会将该记录持久化至不加日期后缀的collection中
 * callback: 异步推送完成后的回调逻辑
 
 第二个send方法没有key参数，适用于单点Kafka服务的场景，从高可用性角度不建议使用此方式
