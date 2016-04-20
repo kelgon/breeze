@@ -21,12 +21,17 @@ public class ProducerThread extends Thread{
 		while(run) {
 			try {
 				log.info("Fetching records from Kafka...");
+				//fetch from kafka, if no records returned in 5 seconds, continue next loop
 				ConsumerRecords<String, String> records = InstanceHolder.kc.poll(5000);
 				log.info(records.count() + " new records fetched");
+				
+				//adding new records to blocking queue
 				for(ConsumerRecord<String, String> record : records) {
 					InstanceHolder.queue.put(record.value());
 				}
 				log.info("added " + records.count() + " records to the queue, queue length: " + InstanceHolder.queue.size());
+				
+				//commit offset to kafka
 				if(records.count() > 0)
 					InstanceHolder.kc.commitSync();
 				Thread.sleep(1000);

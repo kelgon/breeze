@@ -5,6 +5,11 @@ import org.apache.log4j.PropertyConfigurator;
 
 import com.asiainfo.breeze.util.InstanceHolder;
 
+/**
+ * A thread to execute when process exits. Stopping threads gracefully to prevent undone task.
+ * @author kelgon
+ *
+ */
 public class CleanWorkThread extends Thread {
 	private static final Logger log = Logger.getLogger(CleanWorkThread.class);
 	
@@ -15,11 +20,13 @@ public class CleanWorkThread extends Thread {
 			InstanceHolder.timer.cancel();
 			log.info("stopping producer thread...");
 			InstanceHolder.pt.sigStop();
+			//examine producer thread state
 			while(true) {
 				Thread.sleep(100);
 				if(State.TERMINATED.equals(InstanceHolder.pt.getState()))
 					break;
 			}
+			//wait until there is no remaining tasks in the blocking queue
 			log.info("checking remaining tasks...");
 			int count = 0;
 			while(true) {
@@ -33,6 +40,7 @@ public class CleanWorkThread extends Thread {
 			for(ConsumerThread ct : InstanceHolder.cThreads) {
 				ct.sigStop();
 			}
+			//wait until all consumer threads finish their task
 			while(true) {
 				Thread.sleep(500);
 				boolean all = true;
