@@ -23,27 +23,43 @@ public class ConsumerThread extends Thread {
 		log.info(this.getName() + " started");
 		while(run) {
 			try {
-				log.debug("Taking record from queue...");
+				log.info("Taking record from queue...");
+				//take a task from blocking queue, if no tasks to take in 5 seconds, continue next loop
 				String record = InstanceHolder.queue.poll(5000, TimeUnit.MILLISECONDS);
 				if(record == null)
 					continue;
-				
+
+				log.info("Record fetched");
 				log.debug("Record fetched: "+record);
+				
+				//get record creation time and collection name
 				Document doc = Document.parse(record);
 				long createTime = doc.getLong("brzRcdCrtTime");
 				doc.remove("brzRcdCrtTime");
-				String collection = "";
+				String collection;
+				Object c = doc.get("brzRcdCollection");
+				doc.remove("brzRcdCollection");
+				//if no collection name, set to default
+				if(c == null)
+					collection = InstanceHolder.defaultCollection;
+				else {
+					if("".equals(c.toString()))
+						collection = InstanceHolder.defaultCollection;
+					else
+						collection = c.toString();
+				}
+				//add date postfix to collection name
 				if("day".equalsIgnoreCase(InstanceHolder.rollBy)) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
-					collection = InstanceHolder.collection + "_" + sdf.format(new Date(createTime));
+					collection = collection + "_" + sdf.format(new Date(createTime));
 				} else if("month".equalsIgnoreCase(InstanceHolder.rollBy)) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
-					collection = InstanceHolder.collection + "_" + sdf.format(new Date(createTime));
-				} else {
-					collection = InstanceHolder.collection;
+					collection = collection + "_" + sdf.format(new Date(createTime));
 				}
+				
+				//insert record to mongodb
 				InstanceHolder.recordMdb.getCollection(collection).insertOne(doc);
-				log.debug("Record inserted to MongoDB collection \"" + collection + "\"");
+				log.info("Record inserted to MongoDB collection \"" + collection + "\"");
 			} catch(Throwable t) {
 				log.error("Error occured in consumer thead", t);
 			}

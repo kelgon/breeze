@@ -12,7 +12,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoDatabase;
 
 public class InstanceHolder {
-	public static String collection;
+	public static String defaultCollection;
 	public static String rollBy;
 	
 	public static KafkaConsumer<String, String> kc;
