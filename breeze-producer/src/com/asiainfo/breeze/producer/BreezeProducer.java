@@ -45,7 +45,8 @@ public class BreezeProducer {
 			init();
 		}
 		JSONObject obj = (JSONObject)JSON.toJSON(o);
-		obj.put("brzRcdCrtTime", createTime.getTime());
+		if(createTime != null)
+			obj.put("brzRcdCrtTime", createTime.getTime());
 		obj.put("bzRctCollection", collection);
 		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, key, objString), callback);
@@ -65,7 +66,8 @@ public class BreezeProducer {
 			init();
 		}
 		JSONObject obj = (JSONObject)JSON.toJSON(o);
-		obj.put("brzRcdCrtTime", createTime.getTime());
+		if(createTime != null)
+			obj.put("brzRcdCrtTime", createTime.getTime());
 		obj.put("brzRcdCollection", collection);
 		String objString = obj.toJSONString();
 		kp.send(new ProducerRecord<String, String>(topic, objString), callback);
