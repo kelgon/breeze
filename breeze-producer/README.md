@@ -49,13 +49,49 @@
 #### 初始化
 如果breeze-producer尚未初始化，在调用BreezeProducer类的send方法时会自动进行初始化
 
-如果在JSP中使用，可直接在web.xml中注册listener:
+如果在JSP中使用，可以实现一个ServletContextListener，在容器启动时完成breeze-producer的初始化，下面是一个简单的例子：
 
-    <listener>
-        <listener-class>com.asiainfo.breeze.listener.BreezeProducerInitListener</listener-class>
-    </listener>
+    public class BreezeProducerInitListener implements ServletContextListener {
+    	private static final Log log = LogFactory.getLog(BreezeProducerInitListener.class);
+    
+    	public void contextInitialized(ServletContextEvent arg0) {
+    		log.info("Initializing KafkaProducerClient...");
+    		BreezeProducer.init();
+    		log.info("KafkaProducerClient initialization complete");
+    	}
+    
+    	public void contextDestroyed(ServletContextEvent arg0) {
+		
+    	}
+
+    }
+
 
 这样breeze-producer就会在JSP容器启动时自动初始化
 
 ### 推送结构化日志
-BreezeProducer类提供了两种方法
+BreezeProducer类提供了两个方法可以推送结构化信息
+
+* public void send(String topic, String key, Object o, String collection, Date createTime, Callback callback)
+* public void send(String topic, Object o, String collection, Date createTime, Callback callback)
+
+Parameters:
+* topic: Kafka中用于保存结构化消息的Topic名称 
+* key: 待发送对象的key，用于Kafka集群的负载均衡
+* o: 待发送的对象，必须是POJO
+* collection: 结构化消息在MongoDB中对应的collection名，如果传递null或空串，breeze-consumer会使用默认的collection(record.defaultCollectionName)
+* createTime: 结构化消息的创建时间，用于决定该消息插入的collection的日期后缀。如果breeze-consumer中未配置rollBy策略，此参数会被忽视
+* callback: 异步推送完成后的回调逻辑
+
+第二个send方法没有key参数，适用于单点Kafka服务的场景，从高可用性角度不建议使用此方式
+
+使用样例：
+
+    BreezeProducer bp = new BreezeProducer();
+    bp.send("breezeTest", o.getId(), o, "testRecords", o.getCreateDate(), new Callback() {
+        public void onCompletion(RecordMetadata metadata, Exception e) {
+            if (e != null)
+                e.printStackTrace();
+            System.out.println("message send to partition " + metadata.partition() + ", offset: " + metadata.offset());
+        }
+    });
