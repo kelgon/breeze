@@ -34,8 +34,6 @@ public class ConsumerThread extends Thread {
 				
 				//get record creation time and collection name
 				Document doc = Document.parse(record);
-				long createTime = doc.getLong("brzRcdCrtTime");
-				doc.remove("brzRcdCrtTime");
 				String collection;
 				Object c = doc.get("brzRcdCollection");
 				doc.remove("brzRcdCollection");
@@ -48,11 +46,19 @@ public class ConsumerThread extends Thread {
 					else
 						collection = c.toString();
 				}
+				Long createTime;
+				Object cTime = doc.get("brzRcdCrtTime");
+				doc.remove("brzRcdCrtTime");
+				try {
+					createTime = (Long)cTime;
+				} catch(Throwable t) {
+					createTime = null;
+				}
 				//add date postfix to collection name
-				if("day".equalsIgnoreCase(InstanceHolder.rollBy)) {
+				if("day".equalsIgnoreCase(InstanceHolder.rollBy) && createTime != null) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
 					collection = collection + "_" + sdf.format(new Date(createTime));
-				} else if("month".equalsIgnoreCase(InstanceHolder.rollBy)) {
+				} else if("month".equalsIgnoreCase(InstanceHolder.rollBy) && createTime != null) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
 					collection = collection + "_" + sdf.format(new Date(createTime));
 				}
