@@ -75,21 +75,10 @@ public class ConsumerRunner {
 				return false;
 			}
 			String recordCredentials = props.getProperty("breeze.recordCredentials");
-			String configDbName = props.getProperty("breeze.configDbname");
-			if("".equals(configDbName) || configDbName == null) {
-				log.error("config.dbname must not be null or empty!");
-				return false;
-			}
-			String configCredentials = props.getProperty("breeze.configCredentials");
 			List<MongoCredential> mCreList = new ArrayList<MongoCredential>();
 			if(!"".equals(recordCredentials) && recordCredentials != null) {
 				String[] cre = recordCredentials.split(":");
 				MongoCredential credential = MongoCredential.createScramSha1Credential(cre[0], recordDbName, cre[1].toCharArray());
-				mCreList.add(credential);
-			}
-			if(!"".equals(configCredentials) && configCredentials != null) {
-				String[] cre = configCredentials.split(":");
-				MongoCredential credential = MongoCredential.createScramSha1Credential(cre[0], configDbName, cre[1].toCharArray());
 				mCreList.add(credential);
 			}
 			
@@ -159,7 +148,6 @@ public class ConsumerRunner {
 			else
 				InstanceHolder.mClient = new MongoClient(serverList);
 			InstanceHolder.recordMdb = InstanceHolder.mClient.getDatabase(recordDbName);
-			InstanceHolder.configMdb = InstanceHolder.mClient.getDatabase(configDbName);
 			return true;
 		} catch(Throwable t) {
 			log.error("initializing kafka client failed", t);
