@@ -32,13 +32,13 @@ public class BreezeProducer {
 	}
 	
 	/**
-	 * Send a POJO record to Kafka cluster
-	 * @param topic The topic of Kafka will be apended to
-	 * @param key Key of the record, useful for load balancing among partitions
-	 * @param o The record to be sent, must be POJO
-	 * @param collection witch mongodb collection should this record append to
-	 * @param createTime The creation-time of the record(Accurate to milliseconds)
-	 * @param callback The code to execute when the request is complete
+	 * 向Kafka集群(或单点服务)推送一个POJO对象
+	 * @param topic 记录所属的topic
+	 * @param key 记录的key，用于集群broker的负载均衡，如果目标是Kafka单点服务，此参数请传null
+	 * @param o 记录对象，必须是POJO
+	 * @param collection 此记录对应MongoDB中的collection名
+	 * @param createTime 此记录的产生时间（精确到毫秒）
+	 * @param callback 推送完成后的回调逻辑
 	 */
 	public void send(String topic, String key, Object o, String collection, Date createTime, Callback callback) {
 		if(kp == null) {
@@ -47,29 +47,12 @@ public class BreezeProducer {
 		JSONObject obj = (JSONObject)JSON.toJSON(o);
 		if(createTime != null)
 			obj.put("brzRcdCrtTime", createTime.getTime());
-		obj.put("bzRctCollection", collection);
-		String objString = obj.toJSONString();
-		kp.send(new ProducerRecord<String, String>(topic, key, objString), callback);
-	}
-	
-
-	/**
-	 * Send a POJO record to a single-node Kafka (Not recommend)
-	 * @param topic The topic of Kafka will be apended to
-	 * @param o The record to be sent, must be POJO
-	 * @param collection witch mongodb collection should this record append to
-	 * @param createTime The creation-time of the record(Accurate to milliseconds)
-	 * @param callback The code to execute when the request is complete
-	 */
-	public void send(String topic, Object o, String collection, Date createTime, Callback callback) {
-		if(kp == null) {
-			init();
-		}
-		JSONObject obj = (JSONObject)JSON.toJSON(o);
-		if(createTime != null)
-			obj.put("brzRcdCrtTime", createTime.getTime());
 		obj.put("brzRcdCollection", collection);
 		String objString = obj.toJSONString();
-		kp.send(new ProducerRecord<String, String>(topic, objString), callback);
+		if(key == null)
+			kp.send(new ProducerRecord<String, String>(topic, objString), callback);
+		else
+			kp.send(new ProducerRecord<String, String>(topic, key, objString), callback);
 	}
+	
 }
