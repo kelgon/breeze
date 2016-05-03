@@ -28,12 +28,17 @@ import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
 import com.mongodb.MongoClientOptions.Builder;
 
+/**
+ * breeze-watcher启动类
+ * @author kelgon
+ *
+ */
 public class WatcherRunner {
 	private static Logger log = Logger.getLogger(WatcherRunner.class);
 	
 
 	/**
-	 * Initialize MongoDB client
+	 * 初始化MongoDB client
 	 * @return
 	 */
 	private static boolean initMongo() {
@@ -42,8 +47,8 @@ public class WatcherRunner {
 			InputStream is = WatcherRunner.class.getClassLoader().getResourceAsStream("breeze-mongo.properties");
 			Properties props = new Properties();
 			props.load(is);
-			
-			//construct mongo server list
+
+			//构造MongoDB集群serverList
 			String servers = props.getProperty("mongo.servers");
 			if("".equals(servers) || servers == null) {
 				log.error("mongo.servers must not be null or empty!");
@@ -55,8 +60,8 @@ public class WatcherRunner {
 				ServerAddress sa = new ServerAddress(addr[0], Integer.parseInt(addr[1]));
 				serverList.add(sa);
 			}
-			
-			//construct mongo credentials
+
+			//构造MongoDB身份认证对象
 			String adminDbName = props.getProperty("breeze.adminDbName");
 			if("".equals(adminDbName) || adminDbName == null) {
 				log.error("breeze.adminDbName must not be null or empty!");
@@ -93,8 +98,8 @@ public class WatcherRunner {
 				MongoCredential credential = MongoCredential.createScramSha1Credential(cre[0], recordDbName, cre[1].toCharArray());
 				mCreList.add(credential);
 			}
-			
-			//load and construct options
+
+			//从配置文件加载MongoDB客户端参数
 			Builder options = new MongoClientOptions.Builder();
 			if(props.containsKey("mongo.connectionsPerHost"))
 				options.connectionsPerHost(Integer.parseInt(props.getProperty("mongo.connectionsPerHost")));
@@ -162,6 +167,7 @@ public class WatcherRunner {
 			InstanceHolder.monitorMdb = InstanceHolder.mClient.getDatabase(monitorDbName);
 			InstanceHolder.recordMdb = InstanceHolder.mClient.getDatabase(recordDbName);
 
+			//获取集群状态并保存至Map中
 			Document rsStatus = InstanceHolder.mClient.getDatabase("admin").runCommand(new Document("replSetGetStatus", "1"));
 			for(Object o : ((ArrayList<?>)rsStatus.get("members"))) {
 				Document doc = (Document)o;
@@ -178,7 +184,7 @@ public class WatcherRunner {
 	
 
 	/**
-	 * Initialize KafkaProducer client
+	 * 初始化KafkaProducer client
 	 * @return
 	 */
 	private static boolean initKafkaProducer() {
@@ -195,25 +201,59 @@ public class WatcherRunner {
 		}
 	}
 	
+	/**
+	 * 初始化Quartz
+	 * @return
+	 */
 	private static boolean initQuartz() {
 		try {
+			log.info("loading breeze-watcher.properties...");
+			InputStream is = WatcherRunner.class.getClassLoader().getResourceAsStream("breeze-watcher.properties");
+			Properties props = new Properties();
+			props.load(is);
 		    SchedulerFactory sf = new StdSchedulerFactory();
 		    Scheduler sched = sf.getScheduler();
-		    JobDetail job = JobBuilder.newJob(KafkaClusterHealthCheckJob.class).withIdentity("KafkaClusterHealthCheckJob", "group1").build();
-		    CronTrigger trigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("KafkaClusterHealthCheckJobTrigger", "group1").withSchedule(CronScheduleBuilder.cronSchedule("0 0/5 * * * ?")).build();
-		    sched.scheduleJob(job, trigger);
-		    job = JobBuilder.newJob(MongoReplicaHealthCheckJob.class).withIdentity("MongoReplicaHealthCheckJob", "group1").build();
-		    trigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("MongoReplicaHealthCheckJobTrigger", "group1").withSchedule(CronScheduleBuilder.cronSchedule("0 0/5 * * * ?")).build();
-		    sched.scheduleJob(job, trigger);
-		    job = JobBuilder.newJob(ZookeeperHealthCheckJob.class).withIdentity("ZookeeperHealthCheckJob", "group1").build();
-		    trigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("ZookeeperHealthCheckJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule("0 0/5 * * * ?")).build();
-		    sched.scheduleJob(job, trigger);
-		    job = JobBuilder.newJob(DefinedMonitorJob.class).withIdentity("DefinedMonitorJob", "group1").build();
-		    trigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("DefinedMonitorJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule("0 0/1 * * * ?")).build();
-		    sched.scheduleJob(job, trigger);
-		    job = JobBuilder.newJob(CollectionCreateJob.class).withIdentity("CollectionCreateJob", "group1").build();
-		    trigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("CollectionCreateJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule("0 0 2 * * ?")).build();
-		    sched.scheduleJob(job, trigger);
+		    
+		    JobDetail KafkaClusterHealthCheckJob = JobBuilder.newJob(KafkaClusterHealthCheckJob.class).withIdentity("KafkaClusterHealthCheckJob", "group1").build();
+		    String KafkaClusterHealthCheckCron = props.getProperty("KafkaClusterHealthCheckJob.cron");
+		    if("".equals(KafkaClusterHealthCheckCron) || KafkaClusterHealthCheckCron == null) {
+				log.error("KafkaClusterHealthCheckJob.cron must not be null or empty!");
+		    }
+		    CronTrigger KafkaClusterHealthCheckTrigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("KafkaClusterHealthCheckJobTrigger", "group1").withSchedule(CronScheduleBuilder.cronSchedule(KafkaClusterHealthCheckCron)).build();
+		    sched.scheduleJob(KafkaClusterHealthCheckJob, KafkaClusterHealthCheckTrigger);
+		    
+		    JobDetail MongoReplicaHealthCheckJob = JobBuilder.newJob(MongoReplicaHealthCheckJob.class).withIdentity("MongoReplicaHealthCheckJob", "group1").build();
+		    String MongoReplicaHealthCheckCron = props.getProperty("MongoReplicaHealthCheckJob.cron");
+		    if("".equals(MongoReplicaHealthCheckCron) || MongoReplicaHealthCheckCron == null) {
+				log.error("KafkaClusterHealthCheckJob.cron must not be null or empty!");
+		    }
+		    CronTrigger MongoReplicaHealthCheckTrigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("MongoReplicaHealthCheckJobTrigger", "group1").withSchedule(CronScheduleBuilder.cronSchedule(MongoReplicaHealthCheckCron)).build();
+		    sched.scheduleJob(MongoReplicaHealthCheckJob, MongoReplicaHealthCheckTrigger);
+		    
+		    JobDetail ZookeeperHealthCheckJob = JobBuilder.newJob(ZookeeperHealthCheckJob.class).withIdentity("ZookeeperHealthCheckJob", "group1").build();
+		    String ZookeeperHealthCheckCron = props.getProperty("ZookeeperHealthCheckJob.cron");
+		    if("".equals(ZookeeperHealthCheckCron) || ZookeeperHealthCheckCron == null) {
+				log.error("ZookeeperHealthCheckJob.cron must not be null or empty!");
+		    }
+		    CronTrigger ZookeeperHealthCheckTrigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("ZookeeperHealthCheckJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule(ZookeeperHealthCheckCron)).build();
+		    sched.scheduleJob(ZookeeperHealthCheckJob, ZookeeperHealthCheckTrigger);
+		    
+		    JobDetail DefinedMonitorJob = JobBuilder.newJob(DefinedMonitorJob.class).withIdentity("DefinedMonitorJob", "group1").build();
+		    String DefinedMonitorCron = props.getProperty("DefinedMonitorJob.cron");
+		    if("".equals(DefinedMonitorCron) || DefinedMonitorCron == null) {
+				log.error("DefinedMonitorJob.cron must not be null or empty!");
+		    }
+		    CronTrigger DefinedMonitorTrigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("DefinedMonitorJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule(DefinedMonitorCron)).build();
+		    sched.scheduleJob(DefinedMonitorJob, DefinedMonitorTrigger);
+		    
+		    JobDetail CollectionCreateJob = JobBuilder.newJob(CollectionCreateJob.class).withIdentity("CollectionCreateJob", "group1").build();
+		    String CollectionCreateCron = props.getProperty("CollectionCreateJob.cron");
+		    if("".equals(CollectionCreateCron) || CollectionCreateCron == null) {
+				log.error("CollectionCreateJob.cron must not be null or empty!");
+		    }
+		    CronTrigger CollectionCreateTrigger = (CronTrigger)TriggerBuilder.newTrigger().withIdentity("CollectionCreateJob", "group1").withSchedule(CronScheduleBuilder.cronSchedule(CollectionCreateCron)).build();
+		    sched.scheduleJob(CollectionCreateJob, CollectionCreateTrigger);
+		    
 		    sched.start();
 		    return true;
 		} catch(Throwable t) {
