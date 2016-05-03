@@ -11,8 +11,8 @@ import com.asiainfo.breeze.util.AlarmSender;
 import com.asiainfo.breeze.util.InstanceHolder;
 
 /**
- * A task to reload and renew breeze-consumer.properties. 
- * Also examine ProducerThread and ConsumerThread.
+ * 定时检查producer&consumer线程状态，检查阻塞队列长度并告警，更新consumer线程数量，
+ * 更新collection配置
  * @author kelgon
  *
  */
@@ -78,22 +78,44 @@ public class DaemonTask extends TimerTask {
 				}
 			} catch(Throwable t) {
 				log.error("ConsumerThread state-check failed", t);
-				AlarmSender.sendAlarm("[breeze-consumer] ConsumerThread state-check failed!");
+				AlarmSender.sendAlarm("breeze-consumer线程状态检查出错："+t.toString());
 			}
+			
 			//检查队列积压情况
+			log.info("checking untended tasks in blockingQueue...");
 			try {
 				int threshold = Integer.parseInt(props.getProperty("record.queueSizeAlarmThreshold"));
 				int queueSize = InstanceHolder.queue.size();
 				if(queueSize >= threshold) {
-					AlarmSender.sendAlarm("[breeze-consumer] queue size exceeded threshold! size: " + queueSize + ", threshold: " + threshold);
+					AlarmSender.sendAlarm("breeze-consumer队列积压任务数超阈值，当前队列长度：" + queueSize + "，阈值：" + threshold);
 				}
 			} catch(Throwable t) {
 				log.error("ConsumerThread queueSize-check failed", t);
-				AlarmSender.sendAlarm("[breeze-consumer] ConsumerThread queueSize-check failed!");
+				AlarmSender.sendAlarm("breeze-consumer阻塞队列检查出错："+t.toString());
 			}
+			
+			//刷新配置
+			log.info("reload and renew configurations...");
+			String collections = props.getProperty("record.collections");
+			if("".equals(collections) || collections == null) {
+				log.error("record.collections must not be null or empty!");
+				return;
+			}
+			for(String collection : collections.split(",")) {
+				String[] c = collection.split(":");
+				InstanceHolder.collectionMap.put(c[0], c[1]);
+			}
+			String defaultCollection = props.getProperty("record.defaultCollection");
+			if("".equals(defaultCollection) || defaultCollection == null) {
+				log.error("record.defaultCollection must not be null or empty!");
+				return;
+			}
+			InstanceHolder.defaultCollection = defaultCollection.split(":")[0];
+			InstanceHolder.defaultRollBy = defaultCollection.split(":")[1];
+			log.info("DaemonTask done.");
 		} catch(Throwable t) {
 			log.error("error occured in DaemonTask", t);
-			AlarmSender.sendAlarm("[breeze-consumer] error occured in DaemonTask, please check in time");
+			AlarmSender.sendAlarm("[breeze-consumer] DaemonTask执行出错"+t.toString());
 		}
 	}
 

@@ -7,8 +7,7 @@ import org.apache.log4j.Logger;
 import com.asiainfo.breeze.util.InstanceHolder;
 
 /**
- * This thread will continually pull records from Kafka and offer them to a blocking queue,
- * where consumer threads take their tasks from.
+ * 此线程会持续从Kafka集群拉取消息，置入阻塞队列中
  * @author kelgon
  *
  */
@@ -21,17 +20,17 @@ public class ProducerThread extends Thread{
 		while(run) {
 			try {
 				log.info("Fetching records from Kafka...");
-				//fetch from kafka, if no records returned in 5 seconds, continue next loop
+				//从Kafka集群拉取消息，如果5秒内没有任何消息，则继续下一循环
 				ConsumerRecords<String, String> records = InstanceHolder.kc.poll(5000);
 				log.info(records.count() + " new records fetched");
 				
-				//adding new records to blocking queue
+				//将拉取到的消息写入阻塞队列
 				for(ConsumerRecord<String, String> record : records) {
 					InstanceHolder.queue.put(record.value());
 				}
 				log.info("added " + records.count() + " records to the queue, queue length: " + InstanceHolder.queue.size());
 				
-				//commit offset to kafka
+				//向Kafka集群提交offset
 				if(records.count() > 0)
 					InstanceHolder.kc.commitSync();
 				Thread.sleep(1000);
@@ -41,10 +40,9 @@ public class ProducerThread extends Thread{
 		}
 		log.warn("Producer thread ended");
 	}
-	
+
 	/**
-	 * Send a stop signal to this thread. The producer thread will quit after the completion of 
-	 * current loop
+	 * 向此线程发送中止信号，线程会在完成当前循环后退出
 	 */
 	public void sigStop() {
 		this.run = false;

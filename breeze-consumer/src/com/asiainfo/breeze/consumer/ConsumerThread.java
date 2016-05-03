@@ -10,8 +10,7 @@ import org.bson.Document;
 import com.asiainfo.breeze.util.InstanceHolder;
 
 /**
- * This thread will continually take records from the blocking queue, and insert them to
- * the MongoDB collection configured.
+ * 此线程会持续从阻塞队列中读取记录，并将其持久化至MongoDB中
  * @author kelgon
  *
  */
@@ -23,8 +22,8 @@ public class ConsumerThread extends Thread {
 		log.info(this.getName() + " started");
 		while(run) {
 			try {
-				log.info("Taking record from queue...");
-				//take a task from blocking queue, if no tasks to take in 5 seconds, continue next loop
+				log.debug("Taking record from queue...");
+				//从阻塞队列中读取记录，如果5秒内未取到记录，则继续下一循环
 				String record = InstanceHolder.queue.poll(5000, TimeUnit.MILLISECONDS);
 				if(record == null)
 					continue;
@@ -32,19 +31,24 @@ public class ConsumerThread extends Thread {
 				log.info("Record fetched");
 				log.debug("Record fetched: "+record);
 				
-				//get record creation time and collection name
+				//从记录对象中获取目标collection名与记录生成时间
 				Document doc = Document.parse(record);
-				String collection;
+				String collection,rollBy;
 				Object c = doc.get("brzRcdCollection");
 				doc.remove("brzRcdCollection");
-				//if no collection name, set to default
-				if(c == null)
+				if(c == null) {
 					collection = InstanceHolder.defaultCollection;
+					rollBy = InstanceHolder.defaultRollBy;
+				}
 				else {
-					if("".equals(c.toString()))
+					if("".equals(c.toString())) {
 						collection = InstanceHolder.defaultCollection;
-					else
+						rollBy = InstanceHolder.defaultRollBy;
+					}
+					else {
 						collection = c.toString();
+						rollBy = InstanceHolder.collectionMap.get(collection);
+					}
 				}
 				Long createTime;
 				Object cTime = doc.get("brzRcdCrtTime");
@@ -54,11 +58,12 @@ public class ConsumerThread extends Thread {
 				} catch(Throwable t) {
 					createTime = null;
 				}
-				//add date postfix to collection name
-				if("day".equalsIgnoreCase(InstanceHolder.rollBy) && createTime != null) {
+				
+				//在collection名后追加分片时间戳
+				if("day".equalsIgnoreCase(rollBy) && createTime != null) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
 					collection = collection + "_" + sdf.format(new Date(createTime));
-				} else if("month".equalsIgnoreCase(InstanceHolder.rollBy) && createTime != null) {
+				} else if("month".equalsIgnoreCase(rollBy) && createTime != null) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
 					collection = collection + "_" + sdf.format(new Date(createTime));
 				}
@@ -73,8 +78,7 @@ public class ConsumerThread extends Thread {
 	}
 
 	/**
-	 * Send a stop signal to this thread. The producer thread will quit after the completion of 
-	 * current loop
+	 * 向此线程发送中止信号，线程会在完成当前循环后退出
 	 */
 	public void sigStop() {
 		this.run = false;

@@ -19,7 +19,7 @@ import com.mongodb.ServerAddress;
 import com.mongodb.WriteConcern;
 
 /**
- * Use to start breeze-consumer process.  
+ * breeze-consumer启动线程
  * @author kelgon
  *
  */
@@ -27,7 +27,7 @@ public class ConsumerRunner {
 	private static final Logger log = Logger.getLogger(ConsumerRunner.class);
 	
 	/**
-	 * Initialize KafkaConsumer client
+	 * 初始化KafkaConsumer
 	 * @return
 	 */
 	private static boolean initKafkaConsumer() {
@@ -45,7 +45,7 @@ public class ConsumerRunner {
 	}
 	
 	/**
-	 * Initialize MongoDB client
+	 * 初始化MongoDB client
 	 * @return
 	 */
 	private static boolean initMongo() {
@@ -55,7 +55,7 @@ public class ConsumerRunner {
 			Properties props = new Properties();
 			props.load(is);
 			
-			//construct mongo server list
+			//构造MongoDB集群serverList
 			String servers = props.getProperty("mongo.servers");
 			if("".equals(servers) || servers == null) {
 				log.error("mongo.servers must not be null or empty!");
@@ -68,7 +68,7 @@ public class ConsumerRunner {
 				serverList.add(sa);
 			}
 			
-			//construct mongo credentials
+			//构造MongoDB身份认证对象
 			String recordDbName = props.getProperty("breeze.recordDbname");
 			if("".equals(recordDbName) || recordDbName == null) {
 				log.error("record.dbname must not be null or empty!");
@@ -82,7 +82,7 @@ public class ConsumerRunner {
 				mCreList.add(credential);
 			}
 			
-			//load and construct options
+			//从配置文件加载MongoDB客户端参数
 			Builder options = new MongoClientOptions.Builder();
 			if(props.containsKey("mongo.connectionsPerHost"))
 				options.connectionsPerHost(Integer.parseInt(props.getProperty("mongo.connectionsPerHost")));
@@ -150,13 +150,13 @@ public class ConsumerRunner {
 			InstanceHolder.recordMdb = InstanceHolder.mClient.getDatabase(recordDbName);
 			return true;
 		} catch(Throwable t) {
-			log.error("initializing kafka client failed", t);
+			log.error("initializing MongoClient failed", t);
 			return false;
 		}
 	}
 	
 	/**
-	 * Start breeze-consumer threads
+	 * 初始化breeze-consumer
 	 * @return
 	 */
 	private static boolean initBreezeConsumer() {
@@ -168,7 +168,7 @@ public class ConsumerRunner {
 			Properties props = new Properties();
 			props.load(is);
 			
-			//construct blocking queue
+			//初始化阻塞队列
 			log.info("initializing blocking queue...");
 			String queueSize = props.getProperty("consumer.queueSize");
 			if("".equals(queueSize) || queueSize == null) {
@@ -180,7 +180,7 @@ public class ConsumerRunner {
 			else
 				InstanceHolder.queue = new LinkedBlockingQueue<String>(Integer.parseInt(queueSize));
 			
-			//subscribe kafka topic
+			//订阅Kafka topic
 			log.info("subscribing topic...");
 			String topic = props.getProperty("consumer.kafkaTopic");
 			if("".equals(topic) || topic == null) {
@@ -189,22 +189,25 @@ public class ConsumerRunner {
 			}
 			InstanceHolder.kc.subscribe(Arrays.asList(topic));
 			
-			//set collection name and roll mechanism
-			log.info("setting collection name...");
-			String defaultCollection = props.getProperty("record.defaultCollectionName");
-			if("".equals(defaultCollection) || defaultCollection == null) {
-				log.error("record.collectionName must not be null or empty!");
+			//加载并生成Collection name
+			String collections = props.getProperty("record.collections");
+			if("".equals(collections) || collections == null) {
+				log.error("record.collections must not be null or empty!");
 				return false;
 			}
-			InstanceHolder.defaultCollection = defaultCollection;
-			String rollBy = props.getProperty("record.rollBy");
-			if("day".equalsIgnoreCase(rollBy) || "month".equalsIgnoreCase(rollBy)) {
-				InstanceHolder.rollBy = rollBy;
-			} else {
-				InstanceHolder.rollBy = "none";
+			for(String collection : collections.split(",")) {
+				String[] c = collection.split(":");
+				InstanceHolder.collectionMap.put(c[0], c[1]);
 			}
+			String defaultCollection = props.getProperty("record.defaultCollection");
+			if("".equals(defaultCollection) || defaultCollection == null) {
+				log.error("record.defaultCollection must not be null or empty!");
+				return false;
+			}
+			InstanceHolder.defaultCollection = defaultCollection.split(":")[0];
+			InstanceHolder.defaultRollBy = defaultCollection.split(":")[1];
 			
-			//initialize producer&consumer threads
+			//初始化producer&consumer线程
 			log.info("initializing producer&consumer threads...");
 			String threadCount = props.getProperty("consumer.threadCount");
 			if("".equals(threadCount) || threadCount == null) {
@@ -222,14 +225,14 @@ public class ConsumerRunner {
 			}
 			InstanceHolder.consumerNameCount = i;
 			
-			//start consumer and producer threads
+			//启动consumer&producer线程
 			log.info("launching threads...");
 			for(ConsumerThread ct : InstanceHolder.cThreads) {
 				ct.start();
 			}
 			InstanceHolder.pt.start();
 			
-			//register timer task, reload threadCount configuration and check threads every 5 minutes
+			//注册dameon线程，每5分钟执行一次
 			InstanceHolder.timer.schedule(new DaemonTask(), 10000, 5*60*1000);
 			
 			return true;
@@ -243,7 +246,7 @@ public class ConsumerRunner {
 	
 	public static void main(String[] args) {
 		PropertyConfigurator.configure(ConsumerRunner.class.getClassLoader().getResource("log4j.properties"));
-		//add hook triggered when process is about to end.
+		//注册进程退出hook，在进程退出时执行清理逻辑
 		Runtime.getRuntime().addShutdownHook(new CleanWorkThread());
 		log.info("initializing mongo client...");
 		if(ConsumerRunner.initMongo()) {
@@ -257,5 +260,6 @@ public class ConsumerRunner {
 			}
 		}
 		log.error("failed to start breeze-consumer");
+		System.exit(0);
 	}
 }
