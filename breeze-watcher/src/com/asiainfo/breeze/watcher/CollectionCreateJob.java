@@ -76,11 +76,14 @@ public class CollectionCreateJob implements Job{
 			//删除过期collection
 			for(String collection : collections.split(",")) {
 				String rollBy = props.getProperty(collection+".rollBy");
-				int deleteAfter = Integer.parseInt(props.getProperty(collection+".deleteAfter"));
+				String deleteAfter = props.getProperty(collection+".deleteAfter");
+				if("".equals(deleteAfter) || deleteAfter == null)
+					return;
+				int deleteAfterI = Integer.parseInt(props.getProperty(collection+".deleteAfter"));
 				if("day".equalsIgnoreCase(rollBy)) {
 					SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
 					Calendar ca = Calendar.getInstance();
-					ca.add(Calendar.DAY_OF_MONTH, -deleteAfter);
+					ca.add(Calendar.DAY_OF_MONTH, -deleteAfterI);
 					String collection2delete = collection + "_" + sdf.format(ca.getTime());
 					InstanceHolder.recordMdb.getCollection(collection2delete).drop();
 					log.info("collection dropped: " + collection2delete);
@@ -89,7 +92,7 @@ public class CollectionCreateJob implements Job{
 					Calendar ca = Calendar.getInstance();
 					if(ca.get(Calendar.DAY_OF_MONTH) == 2) {
 						SimpleDateFormat sdf = new SimpleDateFormat("yyyyMM");
-						ca.add(Calendar.MONTH, -deleteAfter);
+						ca.add(Calendar.MONTH, -deleteAfterI);
 						String collection2delete = collection + "_" + sdf.format(ca.getTime());
 						InstanceHolder.recordMdb.getCollection(collection2delete).drop();
 						log.info("collection dropped: " + collection2delete);

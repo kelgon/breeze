@@ -138,12 +138,6 @@ public class DefinedMonitorJob implements Job {
 					//处理expression串，将sysdate替换为当前时间
 					String expression = condition.getString("expression");
 					expression = parseDate(expression);
-					//将expression串转换为Bson数组
-					List<Bson> agList = new ArrayList<Bson>();
-					for(Object o : (ArrayList<?>)JSON.parse(expression)) {
-						if(o instanceof Bson)
-							agList.add((Bson)o);
-					}
 					String opType = condition.getString("opType"); //计算类型，find或aggregate
 					String operator = condition.getString("operator"); //与阈值的比较符
 					if(collection == null) {
@@ -161,6 +155,12 @@ public class DefinedMonitorJob implements Job {
 						resDoc = InstanceHolder.recordMdb.getCollection(collection).find(Document.parse(expression)).first();
 					} else if("aggregate".equals(opType)) {
 						//执行aggregate操作
+						//将expression串转换为Bson数组
+						List<Bson> agList = new ArrayList<Bson>();
+						for(Object o : (ArrayList<?>)JSON.parse(expression)) {
+							if(o instanceof Bson)
+								agList.add((Bson)o);
+						}
 						resDoc = InstanceHolder.recordMdb.getCollection(collection).aggregate(agList).first();
 					} else {
 						log.error("自定义监控 [" + doc.getString("jobName") + "] alarmCondition.opType配置有误：" + opType);
