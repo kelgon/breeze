@@ -11,7 +11,7 @@
 * fastjson-1.2.7 (版本号非严格要求)
 * slf4j-simple-1.7.6 (非必须，用于调试时输出Kafka日志到控制台)
 
-#### breeze-producer的使用依赖下列jar：
+#### breeze-producer的运行依赖下列jar：
 * kafka-clients-0.9.0.1
 * lz4-1.2.0
 * slf4j-api-1.7.6
@@ -88,17 +88,16 @@ breeze-producer的运行依赖于kafka client，需要在classpath下添加breez
 BreezeProducer类提供了两个方法可以推送结构化信息
 
 * public void send(String topic, String key, Object o, String collection, Date createTime, Callback callback)
-* public void send(String topic, Object o, String collection, Date createTime, Callback callback)
 
 Parameters:
-* topic: Kafka中用于保存结构化消息的Topic名称 
-* key: 待发送对象的key，用于Kafka集群的负载均衡
-* o: 待发送的对象，必须是POJO
-* collection: 结构化消息在MongoDB中对应的collection名，如果传递null或空串，breeze-consumer会使用默认的collection(record.defaultCollectionName)
-* createTime: 结构化消息的创建时间，用于决定该消息插入的collection的日期后缀。如果breeze-consumer中未配置rollBy策略，此参数会被忽视。如果传null，breeze-consumer会将该记录持久化至不加日期后缀的collection中
-* callback: 异步推送完成后的回调逻辑
+* topic 记录所属的topic
+* key 记录的key，用于集群broker的负载均衡，如果目标是Kafka单点服务，此参数请传null
+* o 记录对象，必须是POJO
+* collection 此记录对应MongoDB中的collection名
+* createTime 此记录的产生时间（精确到毫秒）
+* callback 推送完成后的回调逻辑
 
-第二个send方法没有key参数，适用于单点Kafka服务的场景，从高可用性角度不建议使用此方式
+从高可用性角度不建议key传null
 
 使用样例：
 
