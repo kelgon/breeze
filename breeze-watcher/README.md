@@ -85,30 +85,27 @@ DefinedMonitorJob会从breeze.monitorDbName的definedMonitor集合中获取自�
     	online: 配置成yes以外的任何值，DefinedMonitorJob都会跳过此监控不执行
     	lastRun: 此监控上次运行的时间，格式为yyyy-MM-dd HH:mm"，初次运行时，将此属性设置为一个较早的时间即可
     	interval: 运行间隔，单位为分钟
-    	alarm: 告警内容的文字模板，动态项包括：当前值{currentValue}，阈值{threshold}，历史值{historyValue}，变化幅度{percent}，报告值{报告名称}
-    	alarmCondition: 触发告警的条件对象，如果此属性的值不是一个合法的Bson Document，则DefinedMonitorJob会跳过对其的解析，默认为强制触发告警。也就是说，如果你打算定义一个报告类型的监控（即定时产生报告，无论值是多少都触发告警的发送），可以简单地将此属性定义为""
+    	alarmText: 告警内容的文字模板，固定模板项包括：本次计算结果值{result}，阈值{threshold}，历史值{historyValue}，变化幅度{percent}；动态模板项与alarmCondition.factors.key对应
+    	alarmCondition: 触发告警的条件对象，如果此属性的值必须是一个合法的Bson Document
     	{
-    		collection: 查询的目标集合，格式为[集合名:切分方式]，如"coll1:day"
-    		opType: aggregate或find，DefinedMonitorJob会执行指定的操作
-    		operator: currentValue与threshold的比较方法，包括">","<","=","!=",">="和"<="
-    		threshold: 阈值，应配置为数字
-    		expression: 执行aggregate或find命令时传入的Bson Document，注意双引号的转义。如果命令的条件包含当前时间，则用{sysdate}代替，例如要查询创建时间(createDate)在5分钟内的记录，则{createDate:{$gt:"{sysdate - 5*60*1000}"}}。此操作返回的结果中必须包含result字段，DefinedMonitorJob会取该字段的值为结果值。
-    		compareToHistory: 如果希望定义一个基于变化趋势的告警，可将此属性配置为inc或dec，即增长率和下降率。例如此值配置为inc时，DefinedMonitorJob会将currentValue与此监控在一天前和一周前同一时间点的执行结果进行比较，如果增长率高于threshold则触发告警。如果不希望与历史记录对比，请将此值配置为""
-    	},
-    	reports: 报告对象，有些时候可能会希望在告警文字内容中附加一些额外的信息，这类信息可用report进行配置。只要满足了alarmCondition中告警触发的条件，DefinedMonitorJob就会按reports的配置获取报告值，并加入告警文字中。支持多个report，所以reports属性必须配置为数组。如果不希望配置报告，可将reports属性设为""
-    	[
-    		{
-    			collection: 查询的目标集合，格式为[集合名:切分方式]，如"coll1:day"
-    			reportName: 报告名称，应于告警内容文字幕版中的报告值匹配，如"{rep1}"
-    			expression: 同alarmCondition.expression，区别在于reports只支持aggregate操作
-    		},
-    		{
-    			collection: 同上
-    			reportName: 同上
-    			expression: 同上
-    		},
-    		...
-    	],
+    		compareToHistory: 如果希望定义一个基于变化趋势的告警，可将此属性配置为inc或dec，即增长率和下降率。例如此值配置为inc时，DefinedMonitorJob会将currentValue与此监控在一天前和一周前同一时间点的执行结果进行比较，如果增长率高于threshold则触发告警。如果不希望与历史记录对比，请将此值配置为"no"
+    		resultExpr: 结果值的计算表达式，结果值可以是执行alarmCondition.factors得出的结果值，也可以是多个factor的结果值通过运算得出的值。
+    		operator: 本次计算结果值与阈值的比较方法，比较结果为true则触发告警。比较方法包括">","<","=","!=",">="和"<="，如果配置为""，则不会与阈值进行比较，强制触发告警
+    		threshold: 阈值
+    		factors: 表示每个因子的计算方法的对象，必须配置为Bson数组
+    		[
+    			{
+    				key: 本factor计算结果对应alarmText中的模板
+    				collection: 执行命令的目标集合，格式为[集合名:切分方式]，如"coll1:day"，如果不切分，则直接配置为[集合名]
+    				command: aggregate或find，DefinedMonitorJob会在指定集合上执行指定的操作
+    				bson: 执行aggregate或find命令时传入的Bson Document，注意双引号的转义。如果命令的条件包含当前时间，则用{sysdate}代替，例如要查询创建时间(createDate)在5分钟内的记录，则{createDate:{$gt:"{sysdate - 5*60*1000}"}}。
+    				resultKey: 在指定collection上执行command后MongoDB返回的Bson Document中，factor结果值的key
+    			},
+    			{
+    				此处配置其他factor，格式同上
+    			}
+    		]
+    	}
     	receivers: 将告警发送给指定的人，可配置成手机号或邮箱地址等等，逗号分隔
     }
 
@@ -121,49 +118,59 @@ DefinedMonitorJob会从breeze.monitorDbName的definedMonitor集合中获取自�
     	online: "yes",
     	lastRun: "2016-05-04 12:00",
     	interval: 5,
-    	alarm: "5分钟内failed记录告警，当前值{currentValue}，阈值{threshold}",
-    	alarmCondition: 
-    	{
-    		collection: "records:day",
-    		opType: "aggregate",
+    	alarm: "5分钟内failed记录告警，当前值{failedCount}，阈值{threshold}",
+    	alarmCondition: {
+    		compareToHistory: "no",
+    		resultExpr: "failedCount",
     		operator: ">=",
     		threshold: 5,
-    		expression: "[{$match: {createDate: {$gt: \"{sysdate-5*60*1000}\"}, state: \"failed\"},{$group: {_id: null,result: {$sum: 1}}}]",
-    		compareToHistory: ""
-    	},
-    	reports: "",
+    		factors: [
+    			{
+    				key:"failedCount",
+    				collection: "records:day",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-5*60*1000}\"}, state: \"failed\"},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			}
+    		]
+    	}
     	receivers: "admin,user1,user2"
     }
 
 
-每5分钟执行一次，查询records集合中createDate在10分钟内，且state为timeout的记录数量，数量大于等于5时进行告警，同时报告10分钟内costTime字段的平均值。records为一个按月切分的集合：
+每10分钟执行一次，查询records集合中createDate在10分钟内，且state为timeout的记录数量和记录总量，并计算timeout记录的占比，占比大于5%时告警。records为一个按月切分的集合：
 
     {
     	jobName: "自定义监控2",
     	online: "yes",
     	lastRun: "2016-05-04 12:00",
     	interval: 10,
-    	alarm: "10分钟内超时数告警，当前值{currentValue}，阈值{threshold}，10分钟内costTime平均值{avgCost}",
-    	alarmCondition: 
-    	{
-    		collection: "records:month",
-    		opType: "aggregate",
+    	alarm: "timeout率告警，10分钟内timeout记录数{timeoutCount}，总数{totalCount}，timeout率{result}%，阈值{threshold}%",
+    	alarmCondition: {
+    		compareToHistory: "no",
+    		resultExpr: "timeoutCount/totalCount*100",
     		operator: ">=",
     		threshold: 5,
-    		expression: "[{$match: {createDate: {$gt: \"{sysdate-10*60*1000}\"}, state: \"timeout\"},{$group: {_id: null,result: {$sum: 1}}}]",
-    		compareToHistory: ""
-    	},
-    	reports: 
-    	[
-    		{
-    			collection: "records:month",
-    			reportName: "{avgCost}",
-    			expression: "[{$match: {createDate: {$gt: \"{sysdate-10*60*1000}\"}, state: \"timeout\"},{$group: {_id: null,result: {$avg: \"$costTime\"}}}]"
-    		}
-    	],
+    		factors: [
+    			{
+    				key:"timeoutCount",
+    				collection: "records:month",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-10*60*1000}\"}, state: \"timeout\"},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			},
+    			{
+    				key:"totalCount",
+    				collection: "records:month",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-10*60*1000}\"}},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			}
+    		]
+    	}
     	receivers: "admin,user1,user2"
     }
-
+    
 
 每小时执行一次，报告records集合中createDate在1小时内的记录总数和state为success的记录总数，record为一个未切分的集合：
 
@@ -172,24 +179,32 @@ DefinedMonitorJob会从breeze.monitorDbName的definedMonitor集合中获取自�
     	online: "yes",
     	lastRun: "2016-05-04 12:00",
     	interval: 60,
-    	alarm: "1小时内records新纪录数{countAll}，success记录数{countSuccess}",
-    	alarmCondition: "",
-    	reports: 
-    	[
-    		{
-    			collection: "records",
-    			reportName: "{countAll}",
-    			expression: "[{$match: {createDate: {$gt: \"{sysdate-3600*1000}\"}},{$group: {_id: null,result: {$sum: 1}}}]"
-    		},
-    		{
-    			collection: "records",
-    			reportName: "{countSuccess}",
-    			expression: "[{$match: {createDate: {$gt: \"{sysdate-3600*1000}\"}, state: \"success\"},{$group: {_id: null,result: {$sum: 1}}}]"
-    		}
-    	],
+    	alarm: "records情况 报告，1小时内success记录数{successCount}，总记录数{totalCount}",
+    	alarmCondition: {
+    		compareToHistory: "no",
+    		resultExpr: "totalCount",
+    		operator: "",
+    		threshold: 0,
+    		factors: [
+    			{
+    				key:"successCount",
+    				collection: "records",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-60*60*1000}\"}, state: \"success\"},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			},
+    			{
+    				key:"totalCount",
+    				collection: "records",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-60*60*1000}\"}},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			}
+    		]
+    	}
     	receivers: "admin,user1,user2"
     }
-
+    
 
 每小时执行一次，将records集合中createDate在1小时内的记录总数与历史数据比较，增长率超过100%时告警，record为一个按天切分的集合：
 
@@ -198,16 +213,22 @@ DefinedMonitorJob会从breeze.monitorDbName的definedMonitor集合中获取自�
     	online: "yes",
     	lastRun: "2016-05-04 12:00",
     	interval: 5,
-    	alarm: "records新记录数增长率告警，1小时内新记录数{currentValue}，历史同期值{historyValue}，增长率{percent}%，阈值{threshold}%",
-    	alarmCondition: 
-    	{
-    		collection: "records:day",
-    		opType: "aggregate",
+    	alarm: "records新记录数增长率告警，1小时内新记录数{totalCount}，历史同期值{historyValue}，增长率{percent}%，阈值{threshold}%",
+    	alarmCondition: {
+    		compareToHistory: "inc",
+    		resultExpr: "totalCount",
     		operator: ">=",
     		threshold: 100,
-    		expression: "[{$match: {createDate: {$gt: \"{sysdate-5*60*1000}\"}},{$group: {_id: null,result: {$sum: 1}}}]",
-    		compareToHistory: "inc"
-    	},
-    	reports: "",
+    		factors: [
+    			{
+    				key:"totalCount",
+    				collection: "records:day",
+    				command: "aggregate",
+    				bson: "[{$match: {createDate: {$gt: \"{sysdate-60*60*1000}\"}},{$group: {_id: null,result: {$sum: 1}}}]",
+    				resultKey:"result"
+    			}
+    		]
+    	}
     	receivers: "admin,user1,user2"
     }
+    
